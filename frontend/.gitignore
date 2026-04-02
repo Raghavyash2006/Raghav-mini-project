@@ -1,0 +1,18 @@
+# Frontend Build
+.dist
+.env.local
+
+# Common
+node_modules
+.DS_Store
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.Thumbs.db

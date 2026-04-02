@@ -1,0 +1,30 @@
+# Core Framework
+flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.1.1
+werkzeug==3.0.1
+
+# Database
+sqlalchemy==2.0.25
+
+# NLP & Language Detection (pure Python, no C++ compilation needed)
+langdetect==1.0.9
+textblob==0.17.1
+language-tool-python==2.8.1
+
+# AI/API Integration
+openai==1.33.0
+
+# Optional: Advanced NLP (install if needed, but not required for MVP)
+# spacy==3.7.0
+
+# Testing & Code Quality
+pytest==7.4.4
+pytest-flask==1.3.0
+httpx==0.25.2
+black==24.1.1
+flake8==7.0.0
+
+# Utilities
+pydantic==2.5.3
+

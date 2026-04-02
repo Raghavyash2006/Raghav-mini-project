@@ -1,0 +1,184 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalizeAI Minimal</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            background: #06070d;
+            color: #eef2ff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+        .app {
+            width: min(960px, 100%);
+            border: 1px solid #2b2f45;
+            border-radius: 16px;
+            background: linear-gradient(145deg, #0f1220 0%, #12152b 100%);
+            box-shadow: 0 20px 60px rgba(0,0,0,.45);
+            overflow: hidden;
+        }
+        header { padding: 1rem 1.25rem; border-bottom: 1px solid #2c2f43; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { margin:0; font-size:1.15rem; }
+        header .status { font-size:0.82rem; color:#a2adc8; }
+        .content { padding: 1.25rem; display:grid; gap:1rem; }
+        .field { display:grid; gap:0.45rem; }
+        .field label { color:#aab3cd; font-size:0.79rem; font-weight:600; }
+        textarea, select, button { width:100%; border-radius:10px; border:1px solid #2f334f; background:#0e1225; color:#e7efff; font-size:0.95rem; padding:0.75rem 0.8rem; }
+        textarea{min-height:130px; resize:vertical;}
+        select{appearance:none;}
+        .actions{display:flex;gap:0.7rem;margin-top:0.25rem;}
+        .actions button{flex:1;font-weight:700;cursor:pointer;}
+        .primary{background:#4a78ff;border:1px solid #3d62d0;color:#fff;}
+        .secondary{background:#202746;border:1px solid #2f3369;color:#b9c5ef;}
+        .primary:disabled{opacity:.55;cursor:wait;}
+        #result { min-height:140px; background:#101628; border:1px solid #2c2f47; padding:0.9rem; border-radius:10px; overflow-x:auto; white-space:pre-wrap; line-height:1.45; }
+        .footer{font-size:0.78rem;color:#8b96b8;text-align:center;padding:0.85rem;border-top:1px solid #2f334f;}
+        .alert{padding:0.75rem 0.85rem;border-radius:8px;background:#15246a;color:#d1dcff;border:1px solid #314b9e;font-size:0.85rem;display:none;}
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>LocalizeAI Minimal</h1>
+            <div class="status" id="backendStatus">Checking backend...</div>
+        </header>
+        <main class="content">
+            <div class="field">
+                <label for="sourceText">Original Text</label>
+                <textarea id="sourceText" placeholder="Type or paste text to localize..."></textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div class="field">
+                    <label for="targetLanguage">Target Language</label>
+                    <select id="targetLanguage">
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="ar">Arabic</option>
+                        <option value="hi" selected>Hindi</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ru">Russian</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="tone">Tone</label>
+                    <select id="tone">
+                        <option value="neutral" selected>Neutral</option>
+                        <option value="casual">Casual</option>
+                        <option value="formal">Formal</option>
+                        <option value="marketing">Marketing</option>
+                    </select>
+                </div>
+            </div>
+            <div class="actions">
+                <button id="localizeBtn" class="primary">Localize</button>
+                <button id="clearBtn" class="secondary" type="button">Clear</button>
+            </div>
+            <div class="field">
+                <label for="result">Localization Result</label>
+                <div id="result">No output yet.</div>
+            </div>
+            <div id="message" class="alert"></div>
+        </main>
+        <div class="footer">Backend host: <code>http://localhost:8000/v1/localize</code></div>
+    </div>
+    <script>
+        const BACKEND_URL = 'http://localhost:8000/v1/localize';
+        const HEALTH_URL = 'http://localhost:8000/';
+        const backendStatus = document.getElementById('backendStatus');
+        const localizeBtn = document.getElementById('localizeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const sourceText = document.getElementById('sourceText');
+        const targetLanguage = document.getElementById('targetLanguage');
+        const tone = document.getElementById('tone');
+        const result = document.getElementById('result');
+        const message = document.getElementById('message');
+        function showMessage(text, isError = false) {
+            message.style.display = 'block';
+            message.style.background = isError ? '#4f1f1f' : '#15246a';
+            message.textContent = text;
+        }
+        function clearMessage() {
+            message.style.display = 'none';
+            message.textContent = '';
+        }
+        async function checkBackend() {
+            try {
+                const res = await fetch(HEALTH_URL, { method: 'GET' });
+                if (res.ok) {
+                    backendStatus.textContent = 'Backend reachable ✓';
+                    backendStatus.style.color = '#93f4b7';
+                    return true;
+                }
+            } catch (err) {
+                // no-op
+            }
+            backendStatus.textContent = 'Backend not reachable (start backend on localhost:8000)';
+            backendStatus.style.color = '#f18f8f';
+            return false;
+        }
+        async function localize() {
+            clearMessage();
+            const text = sourceText.value.trim();
+            if (!text) {
+                showMessage('Please enter source content to localize.', true);
+                return;
+            }
+            localizeBtn.disabled = true;
+            localizeBtn.textContent = 'Localizing...';
+            const payload = { text, target_language: targetLanguage.value, tone: tone.value };
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    let message = `HTTP ${response.status}`;
+                    if (errData && errData.detail) {
+                        if (Array.isArray(errData.detail)) {
+                            message = errData.detail
+                                .map(item => item.msg || JSON.stringify(item))
+                                .join(' | ');
+                        } else if (typeof errData.detail === 'string') {
+                            message = errData.detail;
+                        } else {
+                            message = JSON.stringify(errData.detail);
+                        }
+                    }
+                    throw new Error(message);
+                }
+                const resultData = await response.json();
+                result.textContent = resultData.localized_text || 'No localized text returned.';
+                showMessage('Localization successful!', false);
+            } catch (error) {
+                console.error('Localize error', error);
+                result.textContent = 'Failed to localize text. See console for details.';
+                showMessage('Error: ' + (error.message || 'Unknown'), true);
+            } finally {
+                localizeBtn.disabled = false;
+                localizeBtn.textContent = 'Localize';
+            }
+        }
+        function clearAll() {
+            sourceText.value = '';
+            result.textContent = 'No output yet.';
+            clearMessage();
+        }
+        localizeBtn.addEventListener('click', localize);
+        clearBtn.addEventListener('click', clearAll);
+        window.addEventListener('DOMContentLoaded', () => checkBackend());
+    </script>
+</body>
+</html>
