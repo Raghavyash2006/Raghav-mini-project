@@ -1,0 +1,42 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+  <div class="module">
+    <h2>Platform overview</h2>
+    <table>
+      <tr><th scope="row">Total users</th><td>{{ site_stats.total_users }}</td></tr>
+      <tr><th scope="row">Active users</th><td>{{ site_stats.active_users }}</td></tr>
+      <tr><th scope="row">Staff users</th><td>{{ site_stats.staff_users }}</td></tr>
+      <tr><th scope="row">Localization jobs</th><td>{{ site_stats.localization_jobs }}</td></tr>
+      <tr><th scope="row">Jobs today</th><td>{{ site_stats.today_jobs }}</td></tr>
+    </table>
+  </div>
+
+  <div class="module">
+    <h2>Recent users</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Joined</th>
+          <th>Last login</th>
+          <th>Jobs</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in site_stats.recent_users %}
+          <tr>
+            <td>{{ user.username }}</td>
+            <td>{{ user.date_joined|date:"M d, Y" }}</td>
+            <td>{{ user.last_login|default:"-" }}</td>
+            <td>{{ user.job_count }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4">No users yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {{ block.super }}
+{% endblock %}

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LocaleForge AI</title>
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <form class="csrf-probe" aria-hidden="true">{% csrf_token %}</form>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <main class="shell dashboard-shell">
+    <header class="topbar reveal">
+      <div class="brand-lockup">
+        <div class="brand-mark">LF</div>
+        <div>
+          <span class="brand-name">LocaleForge</span>
+          <span class="brand-subtitle">Private multilingual workspace</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="user-chip">
+          <span>Signed in as</span>
+          <strong>{{ request.user.username }}</strong>
+        </div>
+        <form method="post" action="{% url 'logout' %}" class="logout-form">
+          {% csrf_token %}
+          <button type="submit" class="secondary-btn">Logout</button>
+        </form>
+      </div>
+    </header>
+
+    <header class="hero reveal">
+      <div>
+        <span class="eyebrow">Your workspace</span>
+        <h1>Localize text and images with context, culture, and intent intact.</h1>
+        <p class="lede">Your requests, history, and feedback stay scoped to this account so you can work privately across languages and regions.</p>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-card">
+          <span>Requests saved</span>
+          <strong>{{ user_job_count|default:0 }}</strong>
+        </div>
+        <div class="stat-card">
+          <span>Variations generated</span>
+          <strong>{{ user_variation_count|default:0 }}</strong>
+        </div>
+        <div class="stat-card">
+          <span>Latest activity</span>
+          <strong>{% if recent_job %}{{ recent_job.created_at|date:"M d, Y" }}{% else %}No requests yet{% endif %}</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="workspace reveal delay-1">
+      <form id="localizeForm" class="panel input-panel" autocomplete="off">
+        <div class="panel-head">
+          <h2>Localization Request</h2>
+          <p>Provide text or upload an image. The engine extracts context and generates tailored variants.</p>
+        </div>
+
+        <label class="field-block">
+          <span>Source text</span>
+          <textarea id="sourceText" name="source_text" placeholder="Enter the text you want to localize..."></textarea>
+        </label>
+
+        <label class="field-block">
+          <span>Image upload for OCR</span>
+          <input id="sourceImage" name="source_image" type="file" accept="image/*">
+        </label>
+
+        <div class="grid two-up controls-grid">
+          <label class="field-block">
+            <span>Source language</span>
+            <select name="source_language">
+              <option value="en" selected>English</option>
+              <option value="hi">Hindi</option>
+              <option value="de">German</option>
+              <option value="fr">French</option>
+              <option value="es">Spanish</option>
+              <option value="it">Italian</option>
+              <option value="pt">Portuguese</option>
+              <option value="ja">Japanese</option>
+              <option value="zh">Chinese</option>
+              <option value="ar">Arabic</option>
+            </select>
+          </label>
+          <label class="field-block">
+            <span>Target language</span>
+            <select name="target_language">
+              <option value="es" selected>Spanish</option>
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+              <option value="de">German</option>
+              <option value="fr">French</option>
+              <option value="it">Italian</option>
+              <option value="pt">Portuguese</option>
+              <option value="ja">Japanese</option>
+              <option value="zh">Chinese</option>
+              <option value="ar">Arabic</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid three-up controls-grid">
+          <label class="field-block">
+            <span>Region</span>
+            <input name="target_region" value="latam" placeholder="latam">
+          </label>
+          <label class="field-block">
+            <span>Tone</span>
+            <select name="tone">
+              <option value="neutral">neutral</option>
+              <option value="formal">formal</option>
+              <option value="professional">professional</option>
+              <option value="casual">casual</option>
+              <option value="marketing">marketing</option>
+              <option value="friendly">friendly</option>
+              <option value="persuasive">persuasive</option>
+              <option value="technical">technical</option>
+              <option value="empathetic">empathetic</option>
+            </select>
+          </label>
+          <label class="field-block">
+            <span>Audience</span>
+            <select name="audience">
+              <option>professionals</option>
+              <option>students</option>
+              <option>gen z</option>
+              <option>general</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="chips">
+          <label><input type="checkbox" name="preserve_intent" checked> Preserve intent</label>
+          <label><input type="checkbox" name="preserve_sentiment" checked> Preserve sentiment</label>
+          <label><input type="checkbox" name="use_ocr" checked> Use OCR when image is present</label>
+        </div>
+
+        <button type="submit" class="primary-btn" id="submitButton">
+          <span class="btn-label">Generate localizations</span>
+          <span class="btn-loader" aria-hidden="true"></span>
+        </button>
+        <p id="formStatus" class="status"></p>
+      </form>
+
+      <aside class="panel output-panel reveal delay-2">
+        <div class="panel-head">
+          <h2>Output</h2>
+          <p>Generated variants, explanation notes, and cultural review.</p>
+        </div>
+
+        <div id="resultSummary" class="summary empty-state">No request submitted yet.</div>
+        <div id="primaryResult" class="primary-result empty-state">Your selected language and tone output will appear here.</div>
+        <div id="loadingState" class="loading-state hidden" aria-live="polite">
+          <span class="pulse-dot"></span>
+          <p>Building localized variations...</p>
+        </div>
+        <div id="variationList" class="variation-list variation-grid"></div>
+        <div class="dual-panels">
+          <section class="mini-panel">
+            <h3>Explanation</h3>
+            <div id="explanationList" class="info-list"></div>
+          </section>
+          <section class="mini-panel">
+            <h3>Cultural checks</h3>
+            <div id="culturalList" class="info-list"></div>
+          </section>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel history-panel reveal delay-3">
+      <div class="panel-head">
+        <h2>Your history</h2>
+        <p>Saved requests, variations, and feedback for this account only.</p>
+        <button type="button" id="historyToggle" class="secondary-btn">Show history</button>
+      </div>
+      <div id="historyList" class="history-list hidden"></div>
+    </section>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

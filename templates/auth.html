@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title|default:"LocaleForge" }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="auth-body">
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <main class="auth-shell">
+    <section class="auth-hero reveal">
+      <div class="brand-lockup large">
+        <div class="brand-mark">LF</div>
+        <div>
+          <span class="brand-name">LocaleForge</span>
+          <span class="brand-subtitle">Private localization for teams and solo work</span>
+        </div>
+      </div>
+      <h1>{{ page_title|default:"Secure your workspace" }}</h1>
+      <p class="lede">{{ page_subtitle|default:"Sign in or create an account to keep your translations, OCR jobs, and feedback private." }}</p>
+      <div class="auth-highlights">
+        <div class="highlight-card">
+          <strong>Private history</strong>
+          <span>Each account only sees its own requests.</span>
+        </div>
+        <div class="highlight-card">
+          <strong>Admin visibility</strong>
+          <span>Usage stats stay visible in the admin panel.</span>
+        </div>
+        <div class="highlight-card">
+          <strong>Fast workflow</strong>
+          <span>Text and image localization stay in one flow.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="auth-card reveal delay-1">
+      <div class="auth-card__topline">
+        <span class="eyebrow">Account</span>
+        <span class="auth-mode-pill">{% if mode == "signup" %}Create account{% else %}Sign in{% endif %}</span>
+      </div>
+      <div class="panel-head auth-panel-head">
+        <h2>{% if mode == "signup" %}Create account{% else %}Sign in{% endif %}</h2>
+        <p>{% if mode == "signup" %}Register to get your own private workspace.{% else %}Access your saved localization history.{% endif %}</p>
+      </div>
+
+      <div class="auth-card__note">
+        <strong>Built for a clean first impression</strong>
+        <p>This page now behaves like a real product screen, with clearer spacing, stronger hierarchy, and controlled form layout.</p>
+      </div>
+
+      {% if messages %}
+        <div class="message-stack">
+          {% for message in messages %}
+            <div class="flash-message">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="post" class="auth-form {% if mode == 'signup' %}auth-form--signup{% else %}auth-form--login{% endif %}">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="error-box">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% for field in form %}
+          <label class="field-block field-block--{{ field.name }}{% if mode == 'signup' %} field-block--compact{% endif %}">
+            <span>{{ field.label }}</span>
+            {{ field }}
+            {% if field.help_text %}
+              <small class="help-text">{{ field.help_text }}</small>
+            {% endif %}
+            {% if field.errors %}
+              <small class="error-text">{{ field.errors|striptags }}</small>
+            {% endif %}
+          </label>
+        {% endfor %}
+        <button type="submit" class="primary-btn">{% if mode == "signup" %}Create account{% else %}Sign in{% endif %}</button>
+      </form>
+
+      <div class="auth-footer">
+        {% if mode == "signup" %}
+          <span>Already have an account?</span>
+          <a href="{% url 'login' %}">Sign in</a>
+        {% else %}
+          <span>Need an account?</span>
+          <a href="{% url 'signup' %}">Create one</a>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+</body>
+</html>
