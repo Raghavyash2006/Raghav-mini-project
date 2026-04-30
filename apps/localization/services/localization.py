@@ -40,6 +40,55 @@ MARKETING_PREFIXES = [
     "Unlock an easier way to",
 ]
 
+TONE_PREFIXES = {
+    "en": {
+        "formal": "Please note:",
+        "professional": "Please note:",
+        "casual": "Look,",
+        "marketing": "Here’s the thing —",
+        "friendly": "Just so you know,",
+        "persuasive": "Consider this:",
+        "technical": "In practical terms,",
+        "empathetic": "We understand, and",
+    },
+    "hi": {
+        "formal": "कृपया ध्यान दें:",
+        "professional": "कृपया ध्यान दें:",
+        "casual": "देखिए,",
+        "marketing": "ज़रा सोचिए—",
+        "friendly": "बस,",
+        "persuasive": "यह सोचिए कि",
+        "technical": "तकनीकी रूप से देखें तो",
+        "empathetic": "हम समझते हैं कि",
+    },
+    "es": {
+        "formal": "Tenga en cuenta:",
+        "professional": "Tenga en cuenta:",
+        "casual": "Mire,",
+        "marketing": "Piense en esto—",
+        "friendly": "Solo para que lo sepa,",
+        "persuasive": "Considere esto:",
+        "technical": "En términos prácticos,",
+        "empathetic": "Entendemos que",
+    },
+}
+
+LANGUAGE_ALIASES = {
+    "english": "en",
+    "hindi": "hi",
+    "german": "de",
+    "deutsch": "de",
+    "french": "fr",
+    "spanish": "es",
+    "italian": "it",
+    "portuguese": "pt",
+    "japanese": "ja",
+    "chinese": "zh",
+    "mandarin": "zh",
+    "arabic": "ar",
+    "zh-cn": "zh",
+}
+
 @dataclass
 class VariationDraft:
     variant_name: str
@@ -65,11 +114,75 @@ class LocalizationEngine:
         self.idiom_adapter = IdiomCulturalAdapter()
         self.translation_service = TranslationService()
 
+    def _normalize_language_code(self, language):
+        normalized = (language or "").strip().lower().replace("_", "-")
+        if not normalized:
+            return "en"
+        normalized = LANGUAGE_ALIASES.get(normalized, normalized)
+        normalized = normalized.split("-")[0]
+        normalized = LANGUAGE_ALIASES.get(normalized, normalized)
+        if normalized in {"en", "hi", "de", "fr", "es", "it", "pt", "ja", "zh", "ar"}:
+            return normalized
+        return normalized
+
     def _text_excerpt(self, text, limit=96):
         excerpt = re.sub(r"\s+", " ", (text or "")).strip()
         if len(excerpt) <= limit:
             return excerpt
         return excerpt[: max(limit - 3, 0)].rstrip() + "..."
+
+    def _normalize_output_text(self, text):
+        return re.sub(r"\s+", " ", (text or "")).strip()
+
+    def _tone_prefix(self, tone, target_language):
+        tone_key = (tone or "neutral").lower()
+        language_key = self._normalize_language_code(target_language)
+        language_prefixes = TONE_PREFIXES.get(language_key, TONE_PREFIXES["en"])
+
+        if tone_key == "formal":
+            tone_key = "professional"
+
+        return language_prefixes.get(tone_key)
+
+    def _apply_tone_prefix(self, text, tone, target_language):
+        normalized_text = self._normalize_output_text(text)
+        if not normalized_text:
+            return normalized_text
+
+        prefix = self._tone_prefix(tone, target_language)
+        if not prefix:
+            return normalized_text
+
+        if normalized_text.lower().startswith(prefix.lower()):
+            return normalized_text
+
+        return f"{prefix} {normalized_text}"
+
+    def makeProfessional(self, text, target_language="en"):
+        formatted = self._apply_tone_prefix(text, "professional", target_language)
+        target_code = self._normalize_language_code(target_language)
+
+        if target_code == "en":
+            for source, replacement in FORMAL_REPLACEMENTS.items():
+                formatted = re.sub(rf"\b{re.escape(source)}\b", replacement, formatted, flags=re.IGNORECASE)
+
+        return formatted
+
+    def makeCasual(self, text, target_language="en"):
+        formatted = self._apply_tone_prefix(text, "casual", target_language)
+        target_code = self._normalize_language_code(target_language)
+
+        if target_code == "en":
+            for source, replacement in CASUAL_REPLACEMENTS.items():
+                formatted = re.sub(rf"\b{re.escape(source)}\b", replacement, formatted, flags=re.IGNORECASE)
+
+        return formatted
+
+    def makeMarketing(self, text, target_language="en"):
+        formatted = self._apply_tone_prefix(text, "marketing", target_language)
+        if formatted and self._normalize_language_code(target_language) == "en":
+            formatted = formatted.replace(". ", "! ", 1) if ". " in formatted else formatted
+        return formatted
 
     def _build_concise_explanation(
         self,
@@ -141,43 +254,33 @@ class LocalizationEngine:
 
     def apply_tone(self, text, tone, target_language="en"):
         tone = (tone or "neutral").lower()
-        target_language = (target_language or "en").lower()
+        target_language = self._normalize_language_code(target_language)
 
-        if target_language != "en":
-            if tone == "neutral":
-                return text, [{"type": "tone", "message": "Neutral tone maintained."}]
-            return text, [{"type": "tone", "message": f"{tone.title()} tone preference preserved for translated output."}]
-
-        if tone == "formal":
-            for source, target in FORMAL_REPLACEMENTS.items():
-                text = re.sub(rf"\b{re.escape(source)}\b", target, text, flags=re.IGNORECASE)
-            return text, [{"type": "tone", "message": "Formal wording strengthened for professional delivery."}]
-        if tone == "professional":
-            for source, target in FORMAL_REPLACEMENTS.items():
-                text = re.sub(rf"\b{re.escape(source)}\b", target, text, flags=re.IGNORECASE)
-            return text, [{"type": "tone", "message": "Professional tone applied with concise business wording."}]
+        if tone == "neutral":
+            return self._normalize_output_text(text), [{"type": "tone", "message": "Neutral tone maintained."}]
+        if tone in {"formal", "professional"}:
+            return self.makeProfessional(text, target_language), [{"type": "tone", "message": "Professional tone applied after translation with formal sentence framing."}]
         if tone == "casual":
-            for source, target in CASUAL_REPLACEMENTS.items():
-                text = re.sub(rf"\b{re.escape(source)}\b", target, text, flags=re.IGNORECASE)
-            return text, [{"type": "tone", "message": "Wording relaxed for a conversational read."}]
+            return self.makeCasual(text, target_language), [{"type": "tone", "message": "Casual tone applied after translation with conversational sentence framing."}]
         if tone == "marketing":
-            prefix = MARKETING_PREFIXES[0]
-            text = f"{prefix} {text[0].lower() + text[1:] if text else text}" if text else text
-            return text, [{"type": "tone", "message": "Marketing framing added to emphasize value and action."}]
+            return self.makeMarketing(text, target_language), [{"type": "tone", "message": "Marketing tone applied after translation with engaging sentence framing."}]
+
         if tone == "friendly":
-            text = f"Thanks for checking in - {text}" if text else text
-            return text, [{"type": "tone", "message": "Friendly tone applied for warmer communication."}]
+            formatted = self._apply_tone_prefix(text, tone, target_language)
+            return formatted, [{"type": "tone", "message": "Friendly tone applied for warmer communication."}]
         if tone == "persuasive":
-            text = f"Don't miss out: {text}" if text else text
-            return text, [{"type": "tone", "message": "Persuasive tone applied with stronger call-to-action language."}]
+            formatted = self._apply_tone_prefix(text, tone, target_language)
+            return formatted, [{"type": "tone", "message": "Persuasive tone applied with stronger call-to-action language."}]
         if tone == "technical":
-            for source, target in TECHNICAL_REPLACEMENTS.items():
-                text = re.sub(rf"\b{re.escape(source)}\b", target, text, flags=re.IGNORECASE)
-            return text, [{"type": "tone", "message": "Technical tone applied with precise terminology."}]
+            formatted = self._apply_tone_prefix(text, tone, target_language)
+            if target_language == "en":
+                for source, target in TECHNICAL_REPLACEMENTS.items():
+                    formatted = re.sub(rf"\b{re.escape(source)}\b", target, formatted, flags=re.IGNORECASE)
+            return formatted, [{"type": "tone", "message": "Technical tone applied with precise terminology."}]
         if tone == "empathetic":
-            text = f"We understand your concern, and {text[0].lower() + text[1:] if text else text}" if text else text
-            return text, [{"type": "tone", "message": "Empathetic tone applied to acknowledge user concerns."}]
-        return text, [{"type": "tone", "message": "Neutral tone maintained."}]
+            formatted = self._apply_tone_prefix(text, tone, target_language)
+            return formatted, [{"type": "tone", "message": "Empathetic tone applied to acknowledge user concerns."}]
+        return self._normalize_output_text(text), [{"type": "tone", "message": "Neutral tone maintained."}]
 
     def audience_adaptation(self, text, audience, target_language="en"):
         audience = (audience or "general").lower()
@@ -225,25 +328,15 @@ class LocalizationEngine:
     def generate_variants(self, text, variation_types, target_region, target_language, source_text="", source_language="en"):
         variants = []
         prior_variant_texts = []
-        source_language = (source_language or "en").lower()
         target_language = (target_language or "en").lower()
+        base_text = (text or source_text or "").strip()
 
         for variant_name in variation_types:
-            localized_text = text
+            localized_text = base_text
             explanation = []
 
-            if source_text and source_language == "en" and target_language != "en":
-                toned_source, tone_notes = self.apply_tone(source_text, variant_name, target_language="en")
-                localized_text, translation_notes = self.translation_service.translate(
-                    toned_source,
-                    source_language=source_language,
-                    target_language=target_language,
-                )
-                explanation.extend(tone_notes)
-                explanation.extend(translation_notes)
-            else:
-                localized_text, tone_notes = self.apply_tone(localized_text, variant_name, target_language=target_language)
-                explanation.extend(tone_notes)
+            localized_text, tone_notes = self.apply_tone(localized_text, variant_name, target_language=target_language)
+            explanation.extend(tone_notes)
 
             localized_text, diversity_note = self._ensure_meaningful_difference(
                 variant_name=variant_name,
@@ -283,20 +376,10 @@ class LocalizationEngine:
         return intersection / union if union else 0.0
 
     def _inject_tone_signature(self, variant_name, text, target_language="en"):
-        if (target_language or "en").lower() != "en":
-            return text
-
-        signatures = {
-            "formal": "Please note that",
-            "casual": "Quick heads-up:",
-            "marketing": "Act now to",
-        }
-        signature = signatures.get(variant_name)
+        signature = self._tone_prefix(variant_name, target_language)
         if not signature or not text:
             return text
 
-        if variant_name == "marketing" and text.lower().startswith("act now to"):
-            return text
         if text.lower().startswith(signature.lower()):
             return text
         return f"{signature} {text[0].lower() + text[1:] if len(text) > 1 else text.lower()}"
@@ -357,9 +440,8 @@ class LocalizationEngine:
                 target_language=target_language,
             )
 
-        adapted_text = translated_text
+        adapted_text, audience_notes = self.audience_adaptation(translated_text, audience, target_language=target_language)
         adapted_text, tone_notes = self.apply_tone(adapted_text, tone, target_language=target_language)
-        adapted_text, audience_notes = self.audience_adaptation(adapted_text, audience, target_language=target_language)
         cultural_review = self.cultural_checker.check(
             adapted_text,
             target_region=target_region,
@@ -367,12 +449,10 @@ class LocalizationEngine:
             use_ai_validation=True,
         )
         variants = self.generate_variants(
-            adapted_text,
+            translated_text,
             variation_types,
             target_region,
             target_language,
-            source_text=idiom_adapted_text,
-            source_language=source_language,
         )
 
         explanation = self._build_concise_explanation(

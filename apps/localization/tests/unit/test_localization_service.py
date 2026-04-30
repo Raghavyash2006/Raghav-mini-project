@@ -19,6 +19,32 @@ class DummyReview:
 
 
 class LocalizationEngineTests(SimpleTestCase):
+    def test_apply_tone_accepts_language_aliases(self):
+        engine = LocalizationEngine()
+
+        result, notes = engine.apply_tone("Hola mundo", "casual", target_language="spanish")
+
+        self.assertTrue(result.startswith("Mire,"))
+        self.assertEqual(notes[0]["type"], "tone")
+
+    def test_apply_tone_creates_distinct_hindi_outputs(self):
+        engine = LocalizationEngine()
+        base_text = "आज मौसम बारिश का है और मुझे पिज़्ज़ा खाने की इच्छा है।"
+
+        professional, professional_notes = engine.apply_tone(base_text, "professional", target_language="hi")
+        casual, casual_notes = engine.apply_tone(base_text, "casual", target_language="hi")
+        marketing, marketing_notes = engine.apply_tone(base_text, "marketing", target_language="hi")
+
+        self.assertTrue(professional.startswith("कृपया ध्यान दें:"))
+        self.assertTrue(casual.startswith("देखिए,"))
+        self.assertTrue(marketing.startswith("ज़रा सोचिए—"))
+        self.assertNotEqual(professional, casual)
+        self.assertNotEqual(casual, marketing)
+        self.assertNotEqual(professional, marketing)
+        self.assertEqual(professional_notes[0]["type"], "tone")
+        self.assertEqual(casual_notes[0]["type"], "tone")
+        self.assertEqual(marketing_notes[0]["type"], "tone")
+
     @patch("apps.localization.services.localization.LocalizationAIClient.generate")
     @patch("apps.localization.services.localization.IdiomCulturalAdapter.adapt")
     @patch("apps.localization.services.localization.CulturalSensitivityChecker.check")
@@ -66,6 +92,12 @@ class LocalizationEngineTests(SimpleTestCase):
         self.assertIn("variations", result)
         self.assertEqual(len(result["variations"]), 3)
         self.assertSetEqual(set(result["variation_map"].keys()), {"formal", "casual", "marketing"})
+        self.assertTrue(result["localized_text"].startswith("Tenga en cuenta:"))
+        variation_texts = [variation["localized_text"] for variation in result["variations"]]
+        self.assertEqual(len(set(variation_texts)), 3)
+        self.assertTrue(any(text.startswith("Tenga en cuenta:") for text in variation_texts))
+        self.assertTrue(any(text.startswith("Mire,") for text in variation_texts))
+        self.assertTrue(any(text.startswith("Piense en esto—") for text in variation_texts))
         self.assertIn("explanation_data", result)
         self.assertIn("idiom_replacements", result["explanation_data"])
         self.assertIn("cultural_adaptations", result["explanation_data"])
